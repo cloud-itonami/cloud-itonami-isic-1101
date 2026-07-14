@@ -1,0 +1,11 @@
+{:itonami.blueprint/id "cloud-itonami-1101"
+ :itonami.blueprint/name "Plant Operations Coordination — Spirits Distilling"
+ :itonami.blueprint/isic-rev5 "1101"
+ :itonami.blueprint/domain :beverage/spirits-distilling
+ :itonami.blueprint/license "AGPL-3.0-or-later"
+ :itonami.blueprint/social-impact [:product-integrity :regulatory-compliance :supply-chain-traceability]
+ :itonami.blueprint/governor :spirits-distilling-governor
+ :itonami.blueprint/required-technologies [:identity :forms :dmn :bpmn :audit-ledger :cae]
+ :itonami.blueprint/optional-technologies [:optimization :telemetry]
+ :itonami.blueprint/status :public-oss
+ :itonami.blueprint/maturity :implemented}
