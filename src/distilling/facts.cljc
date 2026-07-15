@@ -4,7 +4,7 @@
   marking, and labeling. This namespace contains pure lookup functions for
   regulatory compliance checks -- the Governor calls these to validate
   proposals against jurisdiction requirements."
-  (:require [clojure.string :as str]))
+  (:require [clojure.set :as set]))
 
 (def jurisdictions
   "Spirits distilling jurisdictions and their required documentation/evidence
@@ -66,7 +66,7 @@
       false
       (let [required (set (:required-evidence j))
             present (set checklist)]
-        (clojure.set/subset? required present)))))
+        (set/subset? required present)))))
 
 (def spirit-types
   "Valid spirit product categories and their regulatory/proof requirements."

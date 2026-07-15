@@ -2,19 +2,27 @@
   "Spirits Distilling Governor -- the independent compliance layer that earns
   the DistillingAdvisor the right to commit. The LLM has no notion of:
     - Whether a batch's proof/ABV falls within legal bounds per type/jurisdiction
+    - Whether a batch's actual ABV stayed within tolerance of its declared
+      ABV (risking a federal/jurisdiction excise-tax-class misclassification)
     - Whether an age statement's minimum aging period has been satisfied
     - Whether the batch has the required tax mark/excise compliance clearance
     - Whether the bottle label has been approved by jurisdiction authorities
     - Whether distillation/production records are complete per jurisdiction
+    - Whether the distillery/batch record was independently verified and
+      registered before any proposal is made against it
 
   This MUST be a separate system able to *reject* a proposal and fall back
   to HOLD.
 
-  Unlike direct still/fermentation-process control (NEVER done by this actor
-  -- equipment operation remains exclusive to licensed distillers), the
-  Governor operates on batch metadata: proof, ABV, aging duration, tax marks,
-  labeling approvals. This is plant-operations coordination, not process
-  control.
+  Unlike direct still/fermentation/blending-line control (NEVER done by this
+  actor -- equipment operation remains exclusive to licensed distillers) OR
+  excise/tax-classification-authority decisions (NEVER done by this actor --
+  a batch crossing its declared ABV tolerance band is only ever logged and,
+  if warranted, flagged; reclassifying the batch's federal/state excise-tax
+  category is exclusively a human/tax-authority decision), the Governor
+  operates on batch metadata: proof, ABV, aging duration, tax marks, labeling
+  approvals. This is plant-operations coordination, not process control and
+  not tax administration.
 
   CRITICAL: Any proposal involving excise-tax/age-statement/proof compliance
   concerns ALWAYS escalates to human operator (master distiller/compliance
@@ -22,21 +30,33 @@
   regulatory decisions.
 
   Hard violations (always HOLD, no override):
-    1. No jurisdiction citation (jurisdiction unknown -> can't verify reqs)
-    2. Evidence incomplete (missing required-evidence per jurisdiction)
-    3. Proof/ABV out of range (type/jurisdiction bounds violated)
-    4. Age statement insufficient (minimum aging period not met)
-    5. Tax mark missing (excise compliance not satisfied)
-    6. Bottle label not approved (jurisdiction labeling authority sign-off missing)
-    7. Production record incomplete (distillation log missing required fields)
+    1. Operation outside the closed allowlist (includes any proposal that
+       would touch distillation/blending-line control or excise/
+       tax-classification-authority decisions)
+    2. Proposal asserting an `:effect` other than `:propose`
+    3. Distillery/batch record not independently verified/registered before
+       any proposal is made against it (applies to every proposal op, not
+       only shipment coordination)
+    4. No jurisdiction citation (jurisdiction unknown -> can't verify reqs)
+    5. Evidence incomplete (missing required-evidence per jurisdiction)
+    6. Proof/ABV out of range (type/jurisdiction bounds violated)
+    7. ABV out of the declared batch's tolerance band (excise-tax-class
+       misclassification risk)
+    8. Age statement insufficient (minimum aging period not met)
+    9. Tax mark missing (excise compliance not satisfied)
+   10. Bottle label not approved (jurisdiction labeling authority sign-off missing)
+   11. Production record incomplete (distillation log missing required fields)
+   12. Batch already processed / shipment already finalized (double-commit guards)
 
   Soft gates (always escalate for human):
     - Low confidence
     - Real actuation (`:log-production-batch`, `:coordinate-shipment`)
+    - `:flag-food-safety-concern` (never auto-resolved by confidence alone)
 
-  This design mirrors `meatprocessing.governor` but specializes excise-tax/
-  proof/age-statement concerns rather than food-safety (contamination,
-  sanitation, temperature, time)."
+  This design mirrors `wineops.governor` (ISIC 1102, verified/promoted) but
+  specializes excise-tax/proof/age-statement concerns rather than
+  wine-manufacturing-specific food-safety (SO2 residue, contamination,
+  sanitation, vintage-percent)."
   (:require [distilling.facts :as facts]
             [distilling.registry :as registry]
             [distilling.store :as store]))
@@ -51,14 +71,67 @@
   distiller / compliance officer sign-off."
   #{:log-production-batch :coordinate-shipment})
 
+(def always-escalate-ops
+  "Operations that always require human sign-off, even when the Governor's
+  hard checks are clean and confidence is high: the two high-stakes
+  actuation events (`high-stakes`) plus `:flag-food-safety-concern` -- a
+  food-safety concern (e.g. methanol-cut timing, contamination) is never
+  auto-resolved by advisor confidence alone, it always needs a human look."
+  (conj high-stakes :flag-food-safety-concern))
+
+(def allowed-ops
+  "Closed allowlist of proposal operations this actor may ever make. Any
+  proposal for an operation outside this set -- most importantly direct
+  distillation/blending-line control (still, fermentation, or blending
+  equipment operation) or excise/tax-classification-authority decisions
+  (e.g. reclassifying a batch's federal/state excise-tax category) -- is a
+  hard, permanent block: this actor coordinates plant operations, it does
+  not operate equipment and it has no tax-classification authority."
+  #{:log-production-batch :schedule-maintenance :flag-food-safety-concern :coordinate-shipment})
+
 ;; ----------------------------- checks -----------------------------
+
+(defn- op-not-allowed-violations
+  "HARD, permanent block: any proposal outside the closed operation
+  allowlist (e.g. direct distillation/blending-line control, or an
+  excise/tax-classification-authority decision) is refused unconditionally
+  -- this actor has no authority to make such a proposal at all, let alone
+  commit it."
+  [{:keys [op]} _proposal]
+  (when-not (contains? allowed-ops op)
+    [{:rule :op-not-allowed
+      :detail (str op " はこのactorの許可された提案種別 (log-production-batch/"
+                  "schedule-maintenance/flag-food-safety-concern/coordinate-shipment) "
+                  "に含まれない -- 蒸留/ブレンドライン制御や酒税の税区分判定権限はこのactorに無い")}]))
+
+(defn- effect-not-propose-violations
+  "HARD invariant: this actor's proposals are always `:effect :propose` --
+  it never claims direct write/actuation authority for itself. A proposal
+  asserting any other effect is refused unconditionally."
+  [_request proposal]
+  (when-let [effect (:effect proposal)]
+    (when (not= effect :propose)
+      [{:rule :effect-not-propose
+        :detail (str "この actor の提案は :propose 以外の :effect を持てない (got " effect ")")}])))
+
+(defn- batch-not-registered-violations
+  "HARD invariant: a distillery/batch record must be independently
+  verified/registered in the store BEFORE ANY proposal (not just shipment
+  coordination) can be made against it -- this actor coordinates
+  operations for an already-registered batch, it never invents or
+  self-registers one from an unverified proposal."
+  [{:keys [op subject]} st]
+  (when (contains? allowed-ops op)
+    (when-not (store/batch-by-id st subject)
+      [{:rule :batch-not-registered
+        :detail (str subject " は蒸留所に登録されたバッチ記録が無い -- 提案は進められない")}])))
 
 (defn- spec-basis-violations
   "A proposal with no jurisdiction citation is a HARD violation -- never
   invent a jurisdiction's spirits-compliance requirements."
   [{:keys [op]} proposal]
   (when (contains?
-         #{:log-production-batch :coordinate-shipment :flag-compliance-concern}
+         #{:log-production-batch :coordinate-shipment :flag-food-safety-concern}
          op)
     (let [value (:value proposal)]
       (when (or (empty? (:cites proposal))
@@ -95,6 +168,29 @@
         [{:rule :proof-out-of-range
           :detail (str subject " のproof(" (:proof-us b) " US)が許可範囲["
                       (:proof-min s) ", " (:proof-max s) "] の外 -- バッチ登録提案は進められない")}]))))
+
+(defn- abv-out-of-tolerance-violations
+  "For `:log-production-batch`, INDEPENDENTLY verify that the batch's
+  measured ABV (derived from `:proof-us`, US proof = ABV * 2) falls within
+  the jurisdiction's tolerance band of the batch's declared ABV, via
+  `registry/abv-out-of-tolerance?`. Evaluated UNCONDITIONALLY when both
+  `:proof-us` and `:declared-abv` are present -- crossing the tolerance
+  band risks a federal/jurisdiction excise-tax-class misclassification,
+  which this actor never decides on its own."
+  [{:keys [op subject]} st]
+  (when (= op :log-production-batch)
+    (let [b (store/batch-by-id st subject)
+          j (when b (facts/jurisdiction-by-id (:jurisdiction b)))]
+      (when (and b j (:proof-us b) (:declared-abv b)
+                 (registry/abv-out-of-tolerance?
+                  (/ (:proof-us b) 2.0)
+                  (:declared-abv b)
+                  (:abv-tolerance-pct j)))
+        [{:rule :abv-out-of-tolerance
+          :detail (str subject " の実測ABV(" (/ (:proof-us b) 2.0)
+                      "%)が申告ABV(" (:declared-abv b)
+                      "% ±" (:abv-tolerance-pct j)
+                      "%)の許容誤差を外れる -- 酒税区分の誤分類リスクがあり、バッチ登録提案は進められない")}]))))
 
 (defn- age-statement-insufficient-violations
   "For `:log-production-batch`, if the spirit type requires an age statement,
@@ -168,12 +264,21 @@
 (defn check
   "Censors a DistillingAdvisor proposal against the Governor rules.
   Returns {:ok? bool :violations [..] :confidence c :escalate? bool
-  :high-stakes? bool :hard? bool}."
+  :high-stakes? bool :hard? bool}.
+
+  Stakes (high-stakes actuation vs. always-escalate) are read off the
+  REQUEST's `:op` -- not off the proposal -- since the operation being
+  proposed (not the advisor's self-reported stake) is what determines
+  whether a human must sign off."
   [request _context proposal st]
   (let [hard (into []
-                   (concat (spec-basis-violations request proposal)
+                   (concat (op-not-allowed-violations request proposal)
+                           (effect-not-propose-violations request proposal)
+                           (batch-not-registered-violations request st)
+                           (spec-basis-violations request proposal)
                            (evidence-incomplete-violations request st)
                            (proof-out-of-range-violations request st)
+                           (abv-out-of-tolerance-violations request st)
                            (age-statement-insufficient-violations request st)
                            (tax-mark-missing-violations request st)
                            (label-not-approved-violations request st)
@@ -182,14 +287,15 @@
                            (already-shipment-finalized-violations request st)))
         conf (:confidence proposal 0.0)
         low? (< conf confidence-floor)
-        stakes? (boolean (high-stakes (:stake proposal)))
+        actuation? (boolean (high-stakes (:op request)))
+        escalate-op? (boolean (always-escalate-ops (:op request)))
         hard? (boolean (seq hard))]
-    {:ok?          (and (not hard?) (not low?) (not stakes?))
+    {:ok?          (and (not hard?) (not low?) (not escalate-op?))
      :violations   hard
      :confidence   conf
      :hard?        hard?
-     :escalate?    (and (not hard?) (or low? stakes?))
-     :high-stakes? stakes?}))
+     :escalate?    (and (not hard?) (or low? escalate-op?))
+     :high-stakes? actuation?}))
 
 (defn hold-fact
   "The audit fact written when a proposal is rejected (HOLD)."

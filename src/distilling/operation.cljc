@@ -28,8 +28,7 @@
   high-level flow; production build requires langgraph-clj."
   (:require [distilling.advisor :as advisor]
             [distilling.governor :as governor]
-            [distilling.phase :as phase]
-            [distilling.store :as store]))
+            [distilling.phase :as phase]))
 
 (defn- commit-fact [request context proposal]
   {:t          :committed
@@ -76,8 +75,9 @@
                                                   (cond (:high-stakes? verdict) :actuation
                                                         :else :low-confidence))}
                            :commit (commit-fact request context proposal))
-        record (when (= :commit disposition)
-                 (commit-record request context proposal))]
+        record (if (= :commit disposition)
+                 (commit-record request context proposal)
+                 false)]
     {:disposition disposition
      :audit [advisor-trace disposition-fact]
      :record record

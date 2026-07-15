@@ -68,7 +68,13 @@
 
 (deftest batch-proof-compliance
   (testing "compliant batch passes"
-    (let [result (registry/verify-batch-proof-compliance 100.0 40.0 80.0 190.0 0.5)]
+    ;; 80 US proof == 40.0% ABV (US proof = ABV * 2) -- measured proof and
+    ;; declared ABV must describe the SAME batch. A prior version of this
+    ;; fixture passed measured-proof-us 100.0 (== 50.0% ABV) alongside
+    ;; declared-abv 40.0, a self-contradictory batch that always tripped
+    ;; :abv-tolerance-exceeded -- that was the real bug, not the (correct,
+    ;; symmetric) tolerance-check logic itself.
+    (let [result (registry/verify-batch-proof-compliance 80.0 40.0 80.0 190.0 0.5)]
       (is (true? (:compliant? result)))
       (is (empty? (:issues result)))))
 

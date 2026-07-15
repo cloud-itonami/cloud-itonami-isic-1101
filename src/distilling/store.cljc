@@ -1,8 +1,7 @@
 (ns distilling.store
   "MemStore for batch spirits data. In production, this will be swapped out
   for a Datomic or kotoba-server backend. Today, it's a simple in-memory map
-  keyed by batch-id."
-  (:require [clojure.string :as str]))
+  keyed by batch-id.")
 
 (defprotocol Store
   (batch-by-id [store batch-id] "Retrieve a spirits batch by ID")

@@ -24,32 +24,56 @@ proof-verification → tax-mark-application → label-approval → shipment`.
 
 ## Scope & Compliance
 
-**This actor supports plant-operations coordination ONLY, NOT process
-control.** It does not:
+**This actor supports plant-operations coordination ONLY, NOT direct
+distillation/blending-line control, and it has NO excise/tax-classification
+authority.** It does not:
 - Direct still operation, fermentation, or blending (operator-exclusive)
 - Certify excise-tax compliance or bottling authorization (human-exclusive)
+- Reclassify a batch's federal/state excise-tax category (human/tax-authority-exclusive)
 - Make final spirit-classification decisions (master-distiller-exclusive)
 
 **Hard invariants (always HOLD, no override):**
-- Batch must exist and be verified before any operation
-- Proof/ABV must fall within legal bounds per spirit type + jurisdiction
-- Age statements must be verified against minimum aging period (if required)
-- Tax mark must be applied before logging into production
-- Bottle label must be approved by jurisdiction authority
-- Production records must be complete per jurisdiction
+- Operation outside the closed op-allowlist (`:op-not-allowed`) — includes
+  any proposal that would touch distillation/blending-line control or
+  excise/tax-classification-authority decisions
+- Proposal asserting an `:effect` other than `:propose` (`:effect-not-propose`)
+- Distillery/batch record not independently verified/registered before any
+  proposal is made against it (`:batch-not-registered`) — applies to every
+  proposal op, not only shipment coordination
+- No jurisdiction citation (`:no-spec-basis`)
+- Evidence checklist incomplete (`:evidence-incomplete`)
+- Proof/ABV out of range for spirit type + jurisdiction (`:proof-out-of-range`)
+- Measured ABV outside the declared batch's tolerance band
+  (`:abv-out-of-tolerance`) — a simple, symmetric target±tolerance check
+  (mirrors ISIC 1102's `abv-in-tolerance?`); crossing the band risks an
+  excise-tax-class misclassification, a decision this actor never makes
+- Age statement insufficient — minimum aging period not met (`:age-statement-insufficient`)
+- Tax mark missing (`:tax-mark-missing`)
+- Bottle label not approved by jurisdiction authority (`:label-not-approved`)
+- Production record incomplete (`:production-record-incomplete`)
+- Batch already processed / shipment already finalized (double-commit guards)
 
 **Soft gates (always escalate for human):**
 - Low confidence (<60%)
 - Real actuation (`:log-production-batch`, `:coordinate-shipment`)
-- Compliance concerns (`:flag-compliance-concern`)
+- Food-safety concerns (`:flag-food-safety-concern`) — e.g. methanol-cut
+  timing, contamination — never auto-resolved by advisor confidence alone
 
 ## Operations
 
 Proposal ops (closed allowlist, all `:effect :propose`):
-- `:log-production-batch` — routine batch logging into production records
-- `:schedule-maintenance` — equipment maintenance scheduling
-- `:flag-compliance-concern` — surface excise-tax/labeling/proof concerns
-- `:coordinate-shipment` — outbound product shipment coordination
+- `:log-production-batch` — distillation/blending batch, proof/ABV,
+  cask/aging data logging (always requires human sign-off)
+- `:schedule-maintenance` — still/blending-equipment maintenance scheduling
+- `:flag-food-safety-concern` — surface a food-safety concern (e.g.
+  methanol-cut timing, contamination); always escalates
+- `:coordinate-shipment` — outbound spirits shipment coordination (always
+  requires human sign-off)
+
+Any proposal for an operation outside this allowlist — most importantly
+anything that would amount to direct distillation/blending-line control, or
+an excise/tax-classification-authority decision — is refused unconditionally
+by the Governor (`:op-not-allowed`), regardless of advisor confidence.
 
 ## Jurisdictions
 

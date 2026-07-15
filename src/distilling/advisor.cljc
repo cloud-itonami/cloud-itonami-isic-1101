@@ -5,22 +5,23 @@
   the operation graph; every proposal is routed through the independent
   Governor before committing.
 
-  The advisor makes proposals but has NO direct authority. Proposals are
-  always censored by:
-    1. Governor (proof/ABV, age-statement, tax mark compliance)
+  The advisor makes proposals but has NO direct authority -- every proposal
+  it returns carries `:effect :propose` (never a direct write/actuation
+  effect) and is always censored by:
+    1. Governor (closed op-allowlist, :effect check, batch-registration
+       check, proof/ABV, age-statement, tax mark compliance)
     2. Phase gate (rollout stage)
     3. Human operator (for high-stakes actions)
 
   Current implementation is a mock advisor for testing. Production should
   use langchain/Claude or similar LLM backend (same seam point as
-  `meatprocessing.advisor`)."
-  (:require [distilling.facts :as facts]))
+  `wineops.advisor`).")
 
 ;; Protocol for swappable advisor implementations
 (defprotocol Advisor
   (-advise [advisor store request]
     "Given store and request, return a proposal map with
-    :op, :stake, :value, :cites, :summary, :confidence"))
+    :op, :stake, :effect, :value, :cites, :summary, :confidence"))
 
 ;; Mock advisor for testing
 (defrecord MockAdvisor []
@@ -31,6 +32,7 @@
         :log-production-batch
         {:op :log-production-batch
          :stake :log-production-batch
+         :effect :propose
          :value {:jurisdiction "US"
                  :batch-id subject
                  :spirit-type "bourbon"
@@ -42,6 +44,7 @@
         :coordinate-shipment
         {:op :coordinate-shipment
          :stake :coordinate-shipment
+         :effect :propose
          :value {:batch-id subject
                  :destination "Distributor warehouse"
                  :transport-mode "temperature-controlled"}
@@ -49,20 +52,22 @@
          :summary "Final product proof verified; excise compliance confirmed; ready for shipment"
          :confidence 0.82}
 
-        :flag-compliance-concern
-        {:op :flag-compliance-concern
+        :flag-food-safety-concern
+        {:op :flag-food-safety-concern
          :stake :monitoring
+         :effect :propose
          :value {:batch-id subject
-                 :concern-type "proof-drift"
-                 :description "Measured proof deviated 0.8% from declared ABV after barrel transfer"
-                 :recommended-action "hold-for-revalidation"}
+                 :concern-type "methanol-cut-timing"
+                 :description "Foreshots (methanol-rich heads) cut timing deviated from the still run's proof-based cut schedule -- possible contamination risk"
+                 :recommended-action "hold-for-lab-verification"}
          :cites ["27-CFR-5.28-TTB-Proof-Determination"]
-         :summary "Detected proof tolerance exceedance; escalating for re-measurement"
+         :summary "Detected a food-safety-relevant production anomaly; escalating for human re-verification"
          :confidence 0.70}
 
         :schedule-maintenance
         {:op :schedule-maintenance
          :stake :monitoring
+         :effect :propose
          :value {:equipment "still-5a"
                  :maintenance-type "proof-gauge-certification"
                  :scheduled-date "2026-08-15"}
@@ -72,6 +77,7 @@
 
         {:op op
          :stake :monitoring
+         :effect :propose
          :value {:batch-id subject}
          :cites []
          :summary "Unknown operation"

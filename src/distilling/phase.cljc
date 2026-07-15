@@ -1,7 +1,7 @@
 (ns distilling.phase
   "Rollout phase gating. The DistillingActor is deployed in phases:
     Phase 0: Sandbox (logs only, no actuation)
-    Phase 1: Low-stakes monitoring (flag-compliance-concern, schedule-maintenance)
+    Phase 1: Low-stakes monitoring (flag-food-safety-concern, schedule-maintenance)
     Phase 2: Production logging (log-production-batch on clean proposals)
     Phase 3: Full autonomy (coordinate-shipment + production logging)
 

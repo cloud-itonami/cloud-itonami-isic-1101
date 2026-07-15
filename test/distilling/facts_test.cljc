@@ -7,7 +7,11 @@
     (let [us (facts/jurisdiction-by-id "US")]
       (is (= "US" (:id us)))
       (is (= 100.0 (:proof-standard us)))
-      (is (contains? (:required-evidence us) :proof-gauge-certification))))
+      ;; `:required-evidence` is a vector (order matters for docs/UI
+      ;; rendering), so membership must be checked via `some`/a set --
+      ;; `contains?` on a vector tests INDICES, not element membership,
+      ;; and would silently pass/fail on the wrong thing here.
+      (is (some #{:proof-gauge-certification} (:required-evidence us)))))
 
   (testing "JP jurisdiction"
     (let [jp (facts/jurisdiction-by-id "JP")]

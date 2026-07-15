@@ -5,8 +5,11 @@
   - Tax mark / excise compliance (US TTB, JP 酒税法, EU)
   - Labeling/bottle approval
   - Distillation/production records completeness
-  These are policy checks enforced unconditionally by the Governor."
-  (:require [clojure.string :as str]))
+  These are policy checks enforced unconditionally by the Governor.
+
+  All functions here are pure arithmetic/set/boolean predicates with no
+  host-clock or I/O calls, so this namespace stays trivially portable
+  across Clojure/ClojureScript.")
 
 ;; ===== Proof/ABV compliance =====
 
@@ -18,9 +21,15 @@
       (> measured-proof-us proof-max)))
 
 (defn abv-out-of-tolerance?
-  "Check if measured ABV deviates beyond jurisdiction tolerance (typically 0.5%)."
+  "Independently verify that a batch's measured ABV falls within tolerance
+  of its declared ABV. Symmetric target +/- tolerance window (mirrors
+  `wineops.registry/abv-out-of-tolerance?`, ISIC 1102) -- crossing the
+  window risks a federal/jurisdiction excise-tax-class misclassification
+  (US: 27 CFR 5.37), a decision this actor never makes on its own; it only
+  proposes logging the observed value so a human/tax authority can act."
   [measured-abv declared-abv tolerance-pct]
-  (> (abs (- measured-abv declared-abv)) tolerance-pct))
+  (or (< measured-abv (- declared-abv tolerance-pct))
+      (> measured-abv (+ declared-abv tolerance-pct))))
 
 ;; ===== Age statement compliance =====
 
@@ -57,9 +66,6 @@
   (not (every? #(contains? production-record %) required-keys)))
 
 ;; ===== Compliance utilities =====
-
-(defn abs [x]
-  (if (neg? x) (- x) x))
 
 (defn verify-batch-proof-compliance
   "Comprehensive proof/ABV check. Returns {:compliant? bool :issues []}."

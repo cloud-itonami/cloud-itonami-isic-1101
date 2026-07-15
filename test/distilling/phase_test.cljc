@@ -28,7 +28,7 @@
       (is (= :escalate (:disposition result)))
       (is (= :phase-1-actuation-requires-human (:reason result))))
 
-    (let [request {:op :flag-compliance-concern}
+    (let [request {:op :flag-food-safety-concern}
           result (phase/gate 1 request :commit)]
       (is (= :commit (:disposition result)))))
 
