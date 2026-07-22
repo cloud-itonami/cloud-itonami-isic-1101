@@ -8,4 +8,49 @@
  :itonami.blueprint/required-technologies [:identity :forms :dmn :bpmn :audit-ledger :cae]
  :itonami.blueprint/optional-technologies [:optimization :telemetry]
  :itonami.blueprint/status :public-oss
- :itonami.blueprint/maturity :implemented}
+ :itonami.blueprint/maturity :implemented
+ :itonami.blueprint/implemented-slice
+ "DistillingAdvisor ⊣ Spirits Distilling Governor, langgraph-clj
+ StateGraph (langgraph.graph, distilling.operation/build), append-only
+ audit ledger (distilling.store/ledger + append-ledger!, MemStore).
+ Fixes a severe prior gap, worse than the usual deferred-stub pattern:
+ `deps.edn` declared the real `io.github.kotoba-lang/langgraph`
+ dependency ONLY under the unused `:dev :override-deps` alias (main
+ `:deps` was `{}`), so a plain `clojure -M:test`/`clojure -M:run` never
+ had `langgraph.graph` on the classpath at all; `operation.cljc`'s OWN
+ docstring admitted \"langgraph integration is deferred. This stub
+ version...\" / \"Stub for building a langgraph-clj StateGraph\" -- `build`
+ returned a hand-rolled closure over `run-operation` with ZERO
+ `state-graph`/`add-node`/`interrupt-before` calls anywhere; and
+ `store.cljc` had NO `ledger`/`append-ledger!` function AT ALL -- not
+ dead code, the concept was entirely absent from `src/`, despite prose
+ comments elsewhere implying one should exist. `blueprint.edn`
+ nonetheless claimed `:itonami.blueprint/maturity :implemented`, which
+ was false given all of the above.
+ Now: the real dependency lives in the main `:deps` map (mirrors
+ cloud-itonami-isic-869's `transportops` deps.edn); a genuinely compiled
+ StateGraph (`:intake -> :advise -> :govern -> :decide -+-> :commit /
+ :request-approval -> :commit / :hold`) with
+ `interrupt-before #{:request-approval}` + in-memory checkpointer for
+ real human-in-the-loop resume; and a real `distilling.store/ledger` +
+ `append-ledger!` genuinely wired into the `:commit`/`:hold` graph
+ nodes, not test-only. `distilling.advisor`'s proposal builder and
+ `distilling.governor`'s hard/escalate checks (closed op-allowlist,
+ effect-must-be-:propose, batch-registration chain, proof/ABV range,
+ ABV-vs-declared tolerance band, age-statement minimum, tax-mark, label
+ approval, production-record completeness, double-commit guards) and
+ `distilling.phase`'s 0->3 rollout gate are reused UNCHANGED -- this
+ fix only wires the existing spirits-distilling domain policy into a
+ real compiled graph and a real ledger, it does not redesign it.
+ Proven end-to-end by `test/distilling/operation_test.cljc` (ledger
+ stays empty until a real commit, hold-until-approved for high-stakes
+ batch-logging/shipment-coordination and always-escalating
+ food-safety-concern flags, governor rejection blocks commit,
+ phase-0-sandbox holds even a governor-clean proposal, double-commit
+ guards block re-processing) through the REAL compiled graph, plus a
+ `clojure -M:dev:run` demo runner producing real ledger entries for
+ every scenario. 39 tests / 162 assertions green (`clojure -M:dev:test`,
+ including the 30 pre-existing advisor/governor/facts/phase/registry/
+ store tests, unchanged and still passing), clj-kondo 0 errors/0
+ warnings. CI (`.github/workflows/ci.yml`, sibling-checkout pattern for
+ `:local/root` deps) was missing entirely and is added in this fix."}

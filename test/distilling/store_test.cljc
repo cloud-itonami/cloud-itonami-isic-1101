@@ -31,3 +31,24 @@
     (testing "processed flag per batch"
       (is (true? (store/batch-already-processed? s "batch-001")))
       (is (false? (store/batch-already-processed? s "batch-002"))))))
+
+(deftest mem-store-ledger-append-only
+  (testing "a freshly created store's ledger is empty"
+    (let [s (store/create-mem-store)]
+      (is (empty? (store/ledger s)))))
+
+  (testing "append-ledger! appends in order and returns the fact"
+    (let [s (store/create-mem-store)
+          fact-1 {:t :committed :op :log-production-batch :subject "batch-001"}
+          fact-2 {:t :governor-hold :op :log-production-batch :subject "batch-002"}
+          returned (store/append-ledger! s fact-1)]
+      (is (= fact-1 returned))
+      (store/append-ledger! s fact-2)
+      (is (= [fact-1 fact-2] (store/ledger s)))))
+
+  (testing "ledger is per-store, not shared across store instances"
+    (let [s1 (store/create-mem-store)
+          s2 (store/create-mem-store)]
+      (store/append-ledger! s1 {:t :committed :op :schedule-maintenance})
+      (is (= 1 (count (store/ledger s1))))
+      (is (empty? (store/ledger s2))))))
