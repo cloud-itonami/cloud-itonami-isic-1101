@@ -6,7 +6,9 @@
   (testing "US jurisdiction"
     (let [us (facts/jurisdiction-by-id "US")]
       (is (= "US" (:id us)))
-      (is (= 100.0 (:proof-standard us)))
+      ;; 80.0, not 100.0: 27 CFR 5.143 requires bottling at not less than
+      ;; 80° proof. TTB has no 100-proof minimum (that is Bottled-in-Bond).
+      (is (= 80.0 (:proof-standard us)))
       ;; `:required-evidence` is a vector (order matters for docs/UI
       ;; rendering), so membership must be checked via `some`/a set --
       ;; `contains?` on a vector tests INDICES, not element membership,
@@ -52,3 +54,63 @@
     (is (false? (facts/required-evidence-satisfied?
                  "XX"
                  [:distillation-log])))))
+
+;; ───────── Verified primary-source citations (2026-07-25) ─────────
+
+(deftest every-jurisdiction-rests-on-a-fetched-primary-source
+  (doseq [id (keys facts/jurisdictions)]
+    (is (facts/cited? id)
+        (str id " must carry a legal-basis, an http(s) provenance URL and verbatim text")))
+  (is (nil? (facts/spec-basis "XX")))
+  (is (false? (facts/cited? "XX"))))
+
+(deftest us-tolerance-matches-27-cfr-5-65
+  (testing "5.65(c) allows plus or minus 0.3 percentage points, not 0.5"
+    (is (= 0.3 (:abv-tolerance-pct (facts/jurisdiction-by-id "US")))
+        "the old 0.5 was looser than the statute; this field is Governor-read")))
+
+(deftest eu-authority-is-a-real-regulation
+  (testing "the old \"Spirit Regulation 1601/2009\" does not exist"
+    (let [eu (facts/jurisdiction-by-id "EU")]
+      (is (re-find #"2019/787" (:name eu)))
+      (is (not (re-find #"1601/2009" (:name eu))))
+      (is (re-find #"2019R0787" (:provenance eu))))))
+
+(deftest eu-annex-i-minimums-are-recorded
+  (let [limits (:statutory-limits (facts/jurisdiction-by-id "EU"))]
+    (is (= 15.0 (:general-min-abv-pct limits)) "Art. 2(c)")
+    (is (= 37.5 (:vodka-min-abv-pct limits)))
+    (is (= 37.5 (:gin-min-abv-pct limits)))
+    (is (= 40.0 (:whisky-min-abv-pct limits)))
+    (is (= 3 (:whisky-maturation-min-years limits)))
+    (is (= 700 (:whisky-cask-max-litres limits)))))
+
+(deftest jp-shochu-ceiling-is-recorded-and-the-floor-is-flagged-unverified
+  (let [jp (facts/jurisdiction-by-id "JP")]
+    (is (= 36.0 (-> jp :statutory-limits :continuous-still-shochu-max-abv-pct))
+        "酒税法 第三条: 連続式蒸留焼酎はアルコール分三十六度未満")
+    (is (true? (:proof-standard-unverified? jp))
+        "no statutory 20 % floor was found; flagged rather than asserted")
+    (is (= #{:proof-standard} (facts/unverified-fields "JP")))
+    (is (= #{} (facts/unverified-fields "US")))))
+
+(deftest proof-standard-units-are-explicit
+  (testing "the US value is degrees proof while JP/EU are percent ABV"
+    (is (= :degrees-proof (:proof-standard-unit (facts/jurisdiction-by-id "US"))))
+    (is (= :percent-abv (:proof-standard-unit (facts/jurisdiction-by-id "JP"))))
+    (is (= :percent-abv (:proof-standard-unit (facts/jurisdiction-by-id "EU"))))))
+
+(deftest citation-coverage-reports-unverified-fields
+  (let [c (facts/citation-coverage)]
+    (is (= 3 (:jurisdictions c)))
+    (is (= 3 (:cited c)))
+    (is (= [] (:uncited-jurisdictions c)))
+    (is (= {"JP" [:proof-standard]} (:unverified-fields c))
+        "coverage must surface what is NOT grounded, not only what is")))
+
+(deftest whisky-proof-window-is-grounded
+  (testing "27 CFR 5.143: bottled at not less than 80 proof, distilled under 190 proof"
+    (doseq [id ["bourbon" "scotch"]]
+      (let [s (facts/spirit-type-by-id id)]
+        (is (= 80.0 (:proof-min s)))
+        (is (= 190.0 (:proof-max s)))))))
