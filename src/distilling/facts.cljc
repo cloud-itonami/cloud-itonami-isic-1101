@@ -65,7 +65,7 @@
   shochu `:abv-min-pct` 20.0 are therefore left untouched and flagged
   `:unverified? true` instead of being changed in either direction."
   (:require [clojure.set :as set]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (def jurisdictions
   "Spirits distilling jurisdictions and their required documentation/evidence
