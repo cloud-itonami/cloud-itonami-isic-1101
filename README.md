@@ -91,7 +91,7 @@ minimums, and required evidence checklists per jurisdiction.
 ### Test suite
 
 ```bash
-clj -M:test
+kbb -M:test
 ```
 
 All `.cljc` files run on JVM + Node (portable). No JVM-only constructs.
@@ -99,7 +99,7 @@ All `.cljc` files run on JVM + Node (portable). No JVM-only constructs.
 ### Demo
 
 ```bash
-clj -M:dev:run
+kbb -M:dev:run
 ```
 
 Runs a sample batch-logging workflow through the advisor → governor →
@@ -108,7 +108,7 @@ phase gate → commit flow.
 ### Linting
 
 ```bash
-clj -M:lint
+kbb -M:lint
 ```
 
 Static analysis via clj-kondo. Errors fail CI.
