@@ -42,7 +42,7 @@
  `distilling.phase`'s 0->3 rollout gate are reused UNCHANGED -- this
  fix only wires the existing spirits-distilling domain policy into a
  real compiled graph and a real ledger, it does not redesign it.
- Proven end-to-end by `test/distilling/operation_test.cljc` (ledger
+ Proven end-to-end by `test/distilling/operation_test.cljk` (ledger
  stays empty until a real commit, hold-until-approved for high-stakes
  batch-logging/shipment-coordination and always-escalating
  food-safety-concern flags, governor rejection blocks commit,
