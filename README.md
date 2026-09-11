@@ -78,7 +78,7 @@ by the Governor (`:op-not-allowed`), regardless of advisor confidence.
 ## Jurisdictions
 
 Reference facts for US (TTB), Japan (酒税法), and EU (Regulation 1601/2009)
-are baked into `src/distilling/facts.cljc`. Proof standards, age-statement
+are baked into `src/distilling/facts.cljk`. Proof standards, age-statement
 minimums, and required evidence checklists per jurisdiction.
 
 ## Development
