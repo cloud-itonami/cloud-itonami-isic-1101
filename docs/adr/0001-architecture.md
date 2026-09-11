@@ -8,7 +8,7 @@
 
 The original 2026-07-14 scaffold of this actor was reverted from
 `kotoba-lang/industry` (`:maturity :spec`, never promoted to
-`:implemented`): an independent audit ran `clojure -M:test` directly and
+`:implemented`): an independent audit ran `kbb -M:test` directly and
 found **4 real test failures** despite the promoting agent's claim that all
 tests were green. Root causes (all in test fixtures / production code, not
 in the intended design):
@@ -202,7 +202,7 @@ Test suite covers:
 - **operation_test**: End-to-end flow, audit trail, escalation.
 
 All `.cljc` (portable Clojure/ClojureScript). Tests run on JVM via
-cognitect test-runner (`clojure -M:test`).
+cognitect test-runner (`kbb -M:test`).
 
 ## Future roadmap
 

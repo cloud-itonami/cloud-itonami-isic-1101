@@ -10,7 +10,7 @@
  ;;
  ;; FIX (this commit): the real dependency was previously ONLY declared
  ;; under the unused `:dev :override-deps` alias -- `:deps` was `{}`, so
- ;; a plain `clojure -M:test`/`clojure -M:run` never had `langgraph.graph`
+ ;; a plain `kbb -M:test`/`kbb -M:run` never had `langgraph.graph`
  ;; on the classpath at all. It now lives in the main `:deps` map, the
  ;; path every alias actually resolves against (mirrors
  ;; cloud-itonami-isic-869's `transportops` deps.edn, the freshest
@@ -33,7 +33,7 @@
   :dev {:override-deps
         {io.github.kotoba-lang/langchain
          {:local/root "../../kotoba-lang/langchain"}}}
-  ;; clojure -M:dev:run  -> drive the demo through one OperationActor
+  ;; kbb -M:dev:run  -> drive the demo through one OperationActor
   :run {:main-opts ["-m" "distilling.sim"]}
   :render-html {:main-opts ["-m" "distilling.render-html"]}
   :test {:extra-paths ["test"]

@@ -10,8 +10,8 @@ See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 1. Fork the repo.
 2. Create a branch for your feature/fix.
-3. Ensure tests pass: `clj -M:test`
-4. Ensure linting passes: `clj -M:lint`
+3. Ensure tests pass: `kbb -M:test`
+4. Ensure linting passes: `kbb -M:lint`
 5. Open a PR with a clear description.
 6. Wait for review.
 
