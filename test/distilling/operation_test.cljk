@@ -17,7 +17,7 @@
   `interrupt-before`, and a governor rejection blocks commit entirely.
   Mirrors `transportops.operation-test` (cloud-itonami-isic-869) /
   `knitwear.operation-test` (cloud-itonami-isic-1430)."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [distilling.operation :as op]
             [distilling.store :as store]))
